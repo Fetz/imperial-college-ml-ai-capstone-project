@@ -1,0 +1,4 @@
+.DS_Store
+notebooks/data/*_data
+.ipynb_checkpoints
+__pycache__
