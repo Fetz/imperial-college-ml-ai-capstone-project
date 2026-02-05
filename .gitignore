@@ -1,4 +1,7 @@
 .DS_Store
-notebooks/data/*_data
+.backup_data
+venv
+notebooks/data/initial_data
+notebooks/data/week_*
 .ipynb_checkpoints
 __pycache__

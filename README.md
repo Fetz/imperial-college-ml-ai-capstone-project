@@ -34,9 +34,13 @@ devpod up .
 
 ```
 .
-├── .devcontainer   # [devpod](https://devpod.sh/) configuration
-├── notebooks       # weekly notebooks
-├   ├── data        # data
-├── submissions     # weekly submissions
+├── .devcontainer           # [devpod](https://devpod.sh/) configuration
+├── notebooks               # weekly notebooks
+├   ├── .scripts            # any scripts to help with the course progress
+├   ├── data      
+├       ├── intial_data     # data (excluded from the repo) - download link will later be provided
+├       ├── week_*          # data (excluded from the repo) - these folders are generated using the .scripts and update so we can compare data from different weeks
+├       ├── update          # delta data that we get from each week
+├── submissions             # weekly submissions
 
 ```
