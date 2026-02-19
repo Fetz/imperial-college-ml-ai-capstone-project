@@ -1,0 +1,20 @@
+{
+  "name": "Nix-NVIM-Terminal-Dev",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/nix:1": {
+      "packages": "neovim,git,gcc,nodejs,python3,lazygit"
+    }
+  },
+  "updateContentCommand": "sudo chsh -s /usr/bin/zsh vscode",
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh .devcontainer/dev-start.sh && cp .devcontainer/.zshrc ~/.zshrc",
+  "customizations": {
+    "devpod": {
+      "defaultShell": "/bin/zsh",
+      "sshArgs": [
+        "-R", "/tmp/mykitty:/tmp/mykitty"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}
