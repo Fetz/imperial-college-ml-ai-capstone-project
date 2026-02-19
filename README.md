@@ -10,9 +10,17 @@ This capstone is currently a work in progress.
 
 This is my work for the Capstone project on Black-Box Optimisation (BBO) challenge, this challenge is based on similar BBO challenges that happens in Kaggle like NeurIPS 2020 which ran from July–October, 2020.
 
-## 🎯 Goal
-
 This challenge involves optimising 8 unknown functions with dimensions from 2 to 8 dimensions with initially a pair 10 to 15 data points and output for each function and every week I will submit one data point for each function and I will receive their correspondent output for 13 weeks.
+
+My personal objective is to deepen my knowledge of ML engineering, experiment with different ML frameworks, and use AI tools that can enhance my Software Engineering career.
+
+## Why BBO is relevant?
+
+BBO is relevant for ML scenarios where the objective/true function is expensive to evaluate or has no closed-form expression (e.g: hyperparameter tuning, drug discovery, materials design, or neural architecture search).
+
+## Project Goal
+
+Find the maximum of each function with as few queries as possible.
 
 ## Inputs & Outputs
 
@@ -23,7 +31,7 @@ Will be provided in binary `.npy` format:
 - Vectors: $y \in \mathbb{R}^m$, containing signed floating-point values.
 
 ### 2. Weekly delta:
-Updates are delivered via text `.txt` format. Contrary to initial data, weekly updates will contain exactly 1 data point per function (m = 8).
+Updates are delivered via text `.txt` format. Contrary to initial data, weekly updates will contain exactly 1 output data point per function (8 output data points).
 
 #### A. `input.txt`
 
@@ -31,7 +39,7 @@ A serialized list of NumPy arrays. Each array represents a single coordinate in 
 - List Index + 1 = Function
 - Array Shape: (m, n) where $10 \leq m \leq 15$ and $2 \leq d \leq 8$
 - Value Range: [0.000000, 0.999999]
-- Value Precision: Maximun 6 decimal places.
+- Value Precision: Maximum 6 decimal places.
 - Values Types: Standard Python Float or numpy.float64
 
 #### B. `output.txt`
@@ -51,29 +59,32 @@ Every week we get to submit 1 data point for each function that we want to know 
 
 ## Objective
 
-**Maximise the output of each unknow function** with limited data points and limited to 13 queries.
+**Maximise the output of each unknown function** with limited data points and limited to 13 queries.
 
 Constraints:
-- Function: Unknown shape and structure
-- Function observation: limited to 10 to 15 know data points
-- Number of queries: Limited to 13
-- Response: Delayed
+- Function: Unknown shape → can't use gradient-based methods, must use surrogate models
+- Function observation: limited to 10 to 15 known data points
+- Number of queries: Limited to 13 → each query must be carefully chosen to maximise information
+- Response: Delayed → can't do real-time adaptive strategies within a week
 
 ## Technical approach
 
-### Early strategy (week 1-...)
+- Week 1: Initial exploration using random/grid-based sampling to build a baseline understanding of each function's landscape.
+- Week 2: Fitted GP surrogates with per-function kernel choices (RBF for smooth functions, Matern with varying nu for rougher ones). Used EI and UCB acquisition
+  functions with ad-hoc kappa/xi values. Identified feature importance via ARD length scales and correlation analysis. Used dense meshgrids for candidate
+  generation.
+- Week 3:
+  - Preprocessing: Replaced StandardScaler with QuantileTransformer for functions with extreme outliers (e.g., function 1 spans ~120 orders of magnitude). Added
+  log-space as a second representation
+  - Models: Introduced dual-GP ensembles (one on QT output, one on log-space). Standardised on Matern(nu=2.5) with ARD across all functions
+  - SVMs: Added SVC (RBF kernel, C=10, soft-margin) to classify regions as promising vs not-promising. Used P(promising) as a multiplier on UCB scores to
+  suppress penalty/cliff regions. SVR was tested but excluded from the acquisition ensemble due to lacking native uncertainty estimates
+  - Acquisition: Switched entirely from EI to UCB(kappa=5.0). Replaced meshgrids with Latin Hypercube Sampling, scaling candidates with dimensionality (10K–100K)
+  - Feature selection: Used ARD to identify and drop irrelevant dimensions (e.g., function 8 reduced from 8D to 6D after identifying x6 and x8 as noise)
 
-My early strategy is to focused on exploration over exploitation to increase the model confidence on unexplored areas and then move to exploitation around week 7.
+### Exploration vs exploitation strategy
 
-#### Methods used
-- Gaussian Process (GP).
-- Kernel: RBF & Matérn kernels.
-- Feature importance: ARD (Matérn), Random Forest (purely for visualization).
-- Acquisition Functions: Expected Improvement (EI) & Upper Confidence Bound (UCB).
-- Normalized input & output.
-
-#### Future extensions
-TODO
+My overall strategy prioritises exploration in early weeks and shifts toward exploitation as data accumulates to balance both continuously, I started to introduce UUCB's kappa to control global exploration and the SVM P(promising) constraint to provide exploitation bias.
 
 # Implementation
 
@@ -90,12 +101,12 @@ TODO
 
 ## How to run
 
-### ⚠️ Experimental
+### Experimental
 ```
 devpod up .
 ```
 
-## 🗂️ Structure
+## Structure
 
 ```
 .
