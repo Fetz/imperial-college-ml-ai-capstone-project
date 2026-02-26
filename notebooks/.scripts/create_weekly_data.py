@@ -40,7 +40,7 @@ def parse_outputs_txt(filepath):
         print(f"Error parsing outputs {filepath}: {e}")
         return None
 
-def main():    
+def main():
     try:
         target_week = int(input("Create data for what week? "))
     except ValueError:
