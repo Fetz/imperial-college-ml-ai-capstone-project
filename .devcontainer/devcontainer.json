@@ -7,13 +7,10 @@
     }
   },
   "updateContentCommand": "sudo chsh -s /usr/bin/zsh vscode",
-  "postCreateCommand": "chmod +x .devcontainer/setup.sh .devcontainer/dev-start.sh && cp .devcontainer/.zshrc ~/.zshrc",
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && cp .devcontainer/.zshrc ~/.zshrc",
   "customizations": {
     "devpod": {
-      "defaultShell": "/bin/zsh",
-      "sshArgs": [
-        "-R", "/tmp/mykitty:/tmp/mykitty"
-      ]
+      "defaultShell": "/bin/zsh"
     }
   },
   "remoteUser": "vscode"

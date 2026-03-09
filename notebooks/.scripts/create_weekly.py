@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import shutil
 import os
 import re
 
@@ -48,25 +49,33 @@ def main():
     
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", "data"))
-    
-    functions_data = [[[], []] for _ in range(8)]
-
-    for current_week in range(1, target_week + 1):
-        week_dir = os.path.join(DATA_ROOT, "updates", f"week_{current_week}")
-        in_path = os.path.join(week_dir, "inputs.txt")
-        out_path = os.path.join(week_dir, "outputs.txt")
-
-        week_inputs = parse_inputs_txt(in_path)
-        week_outputs = parse_outputs_txt(out_path)
-
-        if week_inputs and week_outputs:
-            for i in range(8):
-                functions_data[i][0].append(week_inputs[i])
-                functions_data[i][1].append(week_outputs[i])
-        else:
-            print(f"Skipping week {current_week} due to missing or corrupt files.")
-
     output_dir = os.path.join(DATA_ROOT, f"week_{target_week}")
+
+    if (target_week == 1):
+        # Week 1 is the same as initial data
+        init_dir = os.path.join(DATA_ROOT, "initial_data")
+        os.makedirs(output_dir, exist_ok=True)
+        for index in range(8):
+            init_func_dir = os.path.join(init_dir, f"function_{index+1}")
+            out_func_dir = os.path.join(output_dir, f"function_{index+1}")
+            os.makedirs(out_func_dir, exist_ok=True)
+
+            shutil.copy2(os.path.join(init_func_dir, "initial_inputs.npy"), os.path.join(out_func_dir, "inputs.npy"))
+            shutil.copy2(os.path.join(init_func_dir, "initial_outputs.npy"), os.path.join(out_func_dir, "outputs.npy"))
+        
+        return
+    
+    week_dir = os.path.join(DATA_ROOT, "updates", f"week_{target_week}")
+    in_path = os.path.join(week_dir, "inputs.txt")
+    out_path = os.path.join(week_dir, "outputs.txt")
+
+    week_inputs = parse_inputs_txt(in_path)
+    week_outputs = parse_outputs_txt(out_path)
+
+    if not week_inputs or not week_outputs:
+        print(f"Missing or corrupt files for week {target_week}.")
+        return
+    
     os.makedirs(output_dir, exist_ok=True)
 
     for index in range(8):
@@ -77,25 +86,22 @@ def main():
         os.makedirs(output_function_dir, exist_ok=True)
 
         if os.path.exists(x_path) and os.path.exists(y_path):
-            X_updated = np.load(x_path)
-            Y_updated = np.load(y_path)
-
-            X_new_list = np.array(functions_data[index][0])
-            Y_new_list = np.array(functions_data[index][1])
+            X_initial = np.load(x_path)
+            Y_initial = np.load(y_path)
 
             try:
-                for X_item in X_new_list:
-                    X_item = np.array(X_item).reshape(1, -1)
-                    X_updated = np.vstack((X_updated, X_item))
-                
-                for Y_item in Y_new_list:
-                    Y_updated = np.append(Y_updated, Y_item)
+                num_batches = len(week_inputs) // 8
+                X_new_list = [np.array(week_inputs[b * 8 + index]).reshape(1, -1) for b in range(num_batches)]
+                Y_new_list = [week_outputs[b * 8 + index] for b in range(num_batches)]
+
+                X_updated = np.vstack([X_initial] + X_new_list)
+                Y_updated = np.append(Y_initial, Y_new_list)
 
                 np.save(os.path.join(output_function_dir, f"inputs.npy"), X_updated)
                 np.save(os.path.join(output_function_dir, f"outputs.npy"), Y_updated)
-                
+
             except ValueError as e:
-                print(f"Dimension mismatch at function {index}: {e}")
+                print(f"Dimension mismatch at function {index+1}: {e}")
         else:
             print(f"Initial data for function {index+1} not found.")
 

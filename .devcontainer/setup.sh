@@ -26,6 +26,9 @@ cp -r .devcontainer/nvim/. ~/.config/nvim/
 cp .devcontainer/.zshrc ~/.zshrc
 
 # 5. Bootstrap Neovim Plugins
+# Clear any credential helpers from the base image that send stale tokens
+# (the Microsoft devcontainer base image ships helpers that break public clones)
+git config --global --unset-all credential.helper 2>/dev/null || true
 echo "Bootstrapping Neovim..."
 /home/vscode/.nix-profile/bin/nvim +"Lazy! sync" +qa
 

@@ -54,7 +54,7 @@ def plot_2D_initial_data(X, y, title, info_text):
           verticalalignment='top',
           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7))
 
-    plt.show()    
+    plt.show()
 
 def plot_output_outliers(X, y, title, info_text):
     """
@@ -95,7 +95,7 @@ def plot_output_outliers(X, y, title, info_text):
     if len(outlier_indices) > 0:
         outlier_text = 'Detected Outliers:\n'
         for idx in outlier_indices:
-            outlier_text += f'({X[idx][0]}, {X[idx][1]}): {y[idx]}\n'
+            outlier_text += f'({X[idx]}: {y[idx]}\n'
         
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
         ax_2.text(0.02, 0.98, outlier_text.strip(),
@@ -147,65 +147,56 @@ def detect_outliers_iqr(data):
     return outliers, lower_bound, upper_bound
 
 
-def plot_2D_mean_uncertainty(X, model, X1_test, X2_test, mu, sigma):
+def plot_2D_mean_uncertainty(X, X1_test, X2_test, mu, sigma, X_excluded=None):
     """
-    Plot Bar chart to show outliers in the output
-    
+    Plot GP mean prediction and uncertainty as 2D contour maps.
+
     Parameters:
     -----------
-    X: input (2D)
-    model: GaussianProcessRegressor
+    X: training input points used by the model (n_samples, 2)
     X1_test: Prediction grid Dimension 1
     X2_test: Prediction grid Dimension 2
-    mu
-    sigma
+    mu: predicted mean on the grid
+    sigma: predicted std on the grid
+    X_excluded: optional input points not used by the model (n_samples, 2),
+                shown as red triangles to indicate excluded evaluations
     """
 
     mu_grid = mu.reshape(X1_test.shape)
     sigma_grid = sigma.reshape(X1_test.shape)
 
-    # STEP 3: Plot
-    fig = plt.figure(figsize=(16, 12))
-    gs = GridSpec(3, 2, figure=fig, hspace=0.35, wspace=0.3)
+    best_idx = np.argmax(mu)
+    best_x1 = X1_test.ravel()[best_idx]
+    best_x2 = X2_test.ravel()[best_idx]
+
+    fig, (ax_1, ax_2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    for ax in (ax_1, ax_2):
+        ax.scatter(X[:, 0], X[:, 1], c='blue', s=100,
+                edgecolors='black', linewidth=1.5, zorder=5, label='Training points')
+        if X_excluded is not None and len(X_excluded) > 0:
+            ax.scatter(X_excluded[:, 0], X_excluded[:, 1], c='red', s=100,
+                    marker='^', edgecolors='black', linewidth=1.5, zorder=5,
+                    label='Excluded points')
 
     # 2D Mean
-    ax_1 = fig.add_subplot(gs[0, 0])
     contour = ax_1.contourf(X1_test, X2_test, mu_grid, levels=20, cmap='RdYlGn')
-    ax_1.scatter(X[:, 0], X[:, 1], c='blue', s=100, 
-            edgecolors='black', linewidth=1.5, zorder=5)
+    ax_1.scatter(best_x1, best_x2, c='magenta', s=300, marker='*',
+            edgecolors='black', linewidth=1.5, zorder=10, label='Predicted peak')
     ax_1.set_xlabel('Input 1')
     ax_1.set_ylabel('Input 2')
     ax_1.set_title('GP Mean Prediction (Function Shape)')
+    ax_1.legend()
     plt.colorbar(contour, ax=ax_1, label='Predicted Output')
 
     # 2D Uncertainty
-    ax_2 = fig.add_subplot(gs[0, 1])
     contour = ax_2.contourf(X1_test, X2_test, sigma_grid, levels=20, cmap='YlOrRd')
-    ax_2.scatter(X[:, 0], X[:, 1], c='blue', s=100, 
-            edgecolors='black', linewidth=1.5, zorder=5)
     ax_2.set_xlabel('Input 1')
     ax_2.set_ylabel('Input 2')
     ax_2.set_title('GP Uncertainty (Where is GP Confident?)')
     plt.colorbar(contour, ax=ax_2, label='Uncertainty (Std Dev)')
 
-    # 3D Mean
-    ax_3 = fig.add_subplot(gs[1, 0], projection='3d')
-    ax_3.plot_surface(X1_test, X2_test, mu_grid, cmap='RdYlGn')
-    ax_3.set_xlabel('Input 1')
-    ax_3.set_ylabel('Input 2')
-    ax_3.set_zlabel('Predicted Output')
-    ax_3.set_title('GP Mean Prediction (Function Shape) - 3D')
-    ax_3.view_init(elev=25, azim=45)
-
-    # 3D Uncertainty
-    ax_4 = fig.add_subplot(gs[1, 1], projection='3d')
-    ax_4.plot_surface(X1_test, X2_test, sigma_grid, cmap='YlOrRd')
-    ax_4.set_xlabel('Input 1')
-    ax_4.set_ylabel('Input 2')
-    ax_4.set_zlabel('Uncertainty (Std)')
-    ax_4.set_title('GP Uncertainty Surface (3D)')
-    ax_4.view_init(elev=25, azim=45)
-
+    plt.tight_layout()
     plt.show()
 
 
@@ -289,82 +280,6 @@ def plot_4D_initial_data(X, y, title, info_text):
     title : str, plot title
     info_text : str, explanatory text
     """
-
-    # # 1. Prepare Data
-    # n_samples, n_dims = X.shape
-    # cols = [f'$x_{i+1}$' for i in range(n_dims)]
-    # df = pd.DataFrame(X, columns=cols)
-    # df['y'] = y
-    
-    # # Normalize data for plotting between 0 and 1 so axes are comparable
-    # # But we keep the labels for the original scale
-    # df_norm = (df - df.min()) / (df.max() - df.min())
-
-    # fig = plt.figure(figsize=(18, 10))
-    # gs = GridSpec(2, 2, height_ratios=[4, 2], figure=fig, hspace=0.4)
-    # fig.suptitle(title, fontsize=16, fontweight='bold')
-
-
-    # # Add Info Text
-    # ax_info = fig.add_subplot(gs[0, 0])
-    # ax_info.axis('off')
-    # ax_info.text(0.01, 0.5, info_text, fontsize=10, family='monospace',
-    #              bbox=dict(boxstyle='round', facecolor='aliceblue', alpha=0.8))
-    
-
-    # # 3D graph
-    # ax_1 = fig.add_subplot(gs[0, 1], projection='3d')
-    
-    # # Normalize y for marker size so they are visible but not exploding
-    # # We use a min size of 20 and max of 300
-    # y_scaled = ((y - y.min()) / (y.max() - y.min()) * 280) + 20
-
-    # # Scatter plot
-    # # c=X[:, 3] maps the 4th dimension to color
-    # # s=y_scaled maps the output to size
-    # img = ax_1.scatter(X[:, 0], X[:, 1], X[:, 2], 
-    #                  c=X[:, 3], cmap='plasma', 
-    #                  s=y_scaled, edgecolors='k', alpha=0.6)
-
-    # ax_1.set_xlabel('$x_1$')
-    # ax_1.set_ylabel('$x_2$')
-    # ax_1.set_zlabel('$x_3$')
-    
-    # # Legends for the "hidden" dimensions
-    # cbar = fig.colorbar(img, ax=ax_1, pad=0.1)
-    # cbar.set_label('4th Dimension ($x_4$)', rotation=270, labelpad=15)
-    
-    # # Add a size legend proxy
-    # for s in [y.min(), np.median(y), y.max()]:
-    #     ax_1.scatter([], [], [], c='k', alpha=0.3, s=((s - y.min()) / (y.max() - y.min()) * 280) + 20,
-    #                label=f'y = {s:.2f}')
-    # ax_1.legend(title="Output Magnitude", loc='upper left')
-
-
-    # # Parallel Coordinates Visualization
-    # ax_2 = fig.add_subplot(gs[1, :])
-    
-    # # Create a colormap based on the output 'y'
-    # cmap = plt.get_cmap('viridis')
-    
-    # # Plot each row as a line
-    # for i in range(len(df_norm)):
-    #     # Color line based on the normalized 'y' value
-    #     color = cmap(df_norm.iloc[i]['y'])
-    #     ax_2.plot(range(n_dims + 1), df_norm.iloc[i], color=color, alpha=0.5, linewidth=2)
-
-    # # Aesthetics
-    # ax_2.set_xticks(range(n_dims + 1))
-    # ax_2.set_xticklabels(cols + ['Output ($y$)'], fontsize=12)
-    # ax_2.set_yticks([]) # Vertical position is relative (0 to 1)
-    # ax_2.set_title("Each line represents a single sample", pad=20)
-    
-    # # Add Colorbar
-    # sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=y.min(), vmax=y.max()))
-    # cbar = fig.colorbar(sm, ax=ax_2, pad=0.05)
-    # cbar.set_label('Target Value ($y$)', rotation=270, labelpad=15)
-
-    # plt.show()
 
     # Create a single DataFrame
     feature_names = [f'x{i+1}' for i in range(X.shape[1])]
@@ -717,4 +632,565 @@ def plot_3D_mean_uncertainty(X, model, X1_test, X2_test, x3_slice_value=0.5):
     ax4.set_zlabel('Sigma')
     ax4.set_title('3D Surface Uncertainty')
 
+    plt.show()
+
+
+def plot_bar(raw, values, y_label, title):
+    x = np.arange(len(raw))
+
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.bar(x, values, color='skyblue')
+
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f'{float(v) - 10.1:.12f}' for v in raw], rotation=45)
+
+    plt.tight_layout()
+
+
+def plot_bar_diff(raw, before, after, label_before, label_after, y_label, title):
+    width = 0.35
+    x = np.arange(len(raw))
+
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.bar(x - width/2, before, width, label=label_before, color='lightgrey')
+    ax.bar(x + width/2, after, width, label=label_after, color='skyblue')
+
+    # Labeling and Formatting
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f'{float(v) - 10.1:.12f}' for v in raw], rotation=45)
+    ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_log_transform(y_raw, y_log, pos_mask, title='Log10 Transform (Positive Points)', show_top_n=None):
+    """
+    Bar chart showing log10 values for positive points, with placeholders for excluded (negative) points.
+
+    Parameters:
+    -----------
+    y_raw : ndarray, raw output values
+    y_log : ndarray, log10 values of positive points only
+    pos_mask : ndarray, boolean mask for positive points
+    title : str, plot title
+    show_top_n : int or None, if set show only the N smallest and N largest outputs (by y_raw value)
+    """
+    n_points = len(y_raw)
+
+    # Build full-length arrays for plotting
+    log_vals = np.full(n_points, np.nan)
+    log_vals[pos_mask] = y_log
+
+    # Determine which indices to display
+    if show_top_n is not None and show_top_n < n_points // 2:
+        sorted_indices = np.argsort(y_raw)
+        bottom_indices = sorted_indices[:show_top_n]
+        top_indices = sorted_indices[-show_top_n:]
+        display_indices = np.sort(np.concatenate([bottom_indices, top_indices]))
+        display_label = f'Showing {show_top_n} smallest + {show_top_n} largest of {n_points} points'
+    else:
+        display_indices = np.arange(n_points)
+        display_label = None
+
+    n_display = len(display_indices)
+    x = np.arange(n_display)
+
+    fig_width = max(14, n_display * 0.6)
+    fig, ax = plt.subplots(figsize=(fig_width, 7))
+
+    # Map display positions to original indices
+    disp_log_vals = log_vals[display_indices]
+    disp_pos_mask = pos_mask[display_indices]
+    disp_neg_mask = ~disp_pos_mask
+
+    # Light red placeholder bars for excluded points
+    if disp_neg_mask.any():
+        excluded_heights = np.where(disp_neg_mask, y_log.min() * 1.05, np.nan)
+        ax.bar(x[disp_neg_mask], excluded_heights[disp_neg_mask], color='lightcoral', edgecolor='black',
+               alpha=0.4, label=f'Excluded (negative): {(~pos_mask).sum()} pts')
+
+    # Blue bars for included log10 values
+    if disp_pos_mask.any():
+        ax.bar(x[disp_pos_mask], disp_log_vals[disp_pos_mask], color='steelblue', edgecolor='black',
+               alpha=0.8, label=f'Included (positive): {pos_mask.sum()} pts')
+
+    # Annotate each bar with its log10 value
+    fontsize = 8 if n_display <= 22 else 7
+    for j in np.where(disp_pos_mask)[0]:
+        val = disp_log_vals[j]
+        ax.text(j, val + 0.02 * abs(val), f'{val:.1f}', ha='center', va='bottom', fontsize=fontsize)
+
+    # Pad y-axis so labels don't overflow
+    visible_vals = disp_log_vals[~np.isnan(disp_log_vals)]
+    if len(visible_vals) > 0:
+        y_range = visible_vals.max() - visible_vals.min()
+        padding = max(0.15 * y_range, 0.5)
+        ax.set_ylim(visible_vals.min() - 0.1 * y_range, visible_vals.max() + padding)
+
+    ax.set_xlabel('Data Point Index', fontsize=11)
+    ax.set_ylabel('log10(y)', fontsize=11)
+    full_title = title
+    if display_label:
+        full_title += f'\n({display_label})'
+    ax.set_title(full_title, fontsize=12, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(display_indices, fontsize=fontsize)
+    ax.legend(fontsize=10)
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_svm_analysis(X1_test, X2_test, svm_proba, mu_svr_log, mu_svr_qt,
+                      X_train, X_train_pos, X_train_neg, svm_labels):
+    """
+    3-panel plot: SVM classifier probability, SVR log-space surrogate, SVR QT surrogate.
+
+    Parameters:
+    -----------
+    X1_test, X2_test : meshgrid arrays for the prediction surface
+    svm_proba : SVM classifier P(promising) on the grid
+    mu_svr_log : SVR predictions in log-space on the grid
+    mu_svr_qt : SVR predictions in QT-space on the grid
+    X_train : all training points (scaled)
+    X_train_pos : positive training points (scaled)
+    X_train_neg : negative training points (scaled)
+    svm_labels : binary labels (1=promising, 0=not)
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(22, 6))
+    fig.suptitle("SVM Analysis", fontsize=14)
+
+    # SVM Classifier
+    ax = axes[0]
+    cf = ax.contourf(X1_test, X2_test, svm_proba.reshape(X1_test.shape), levels=20, cmap='RdYlGn')
+    ax.scatter(X_train[svm_labels==1, 0], X_train[svm_labels==1, 1],
+               c='green', s=150, edgecolors='k', label='Promising', zorder=5)
+    ax.scatter(X_train[svm_labels==0, 0], X_train[svm_labels==0, 1],
+               c='red', s=150, edgecolors='k', label='Not promising', zorder=5)
+    ax.set_xlabel('$x_1$ (scaled)')
+    ax.set_ylabel('$x_2$ (scaled)')
+    ax.set_title('SVM Classifier: P(promising region)')
+    ax.legend()
+    plt.colorbar(cf, ax=ax)
+
+    # SVR Surrogate on log-space (positive only)
+    ax = axes[1]
+    cf = ax.contourf(X1_test, X2_test, mu_svr_log.reshape(X1_test.shape), levels=20, cmap='RdYlGn')
+    ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='blue', s=150, edgecolors='k', zorder=5)
+    ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='red', s=150, marker='^', edgecolors='k', zorder=5, label='Excluded')
+    ax.set_xlabel('$x_1$ (scaled)')
+    ax.set_ylabel('$x_2$ (scaled)')
+    ax.set_title('SVR Surrogate: log10(y) [pos only]')
+    ax.legend()
+    plt.colorbar(cf, ax=ax, label='log10(y)')
+
+    # SVR Surrogate on QuantileTransformer (all points)
+    ax = axes[2]
+    cf = ax.contourf(X1_test, X2_test, mu_svr_qt.reshape(X1_test.shape), levels=20, cmap='RdYlGn')
+    ax.scatter(X_train[:, 0], X_train[:, 1], c='blue', s=150, edgecolors='k', zorder=5)
+    ax.set_xlabel('$x_1$ (scaled)')
+    ax.set_ylabel('$x_2$ (scaled)')
+    ax.set_title('SVR Surrogate: y_qt [all points]')
+    plt.colorbar(cf, ax=ax, label='QuantileTransformer(y)')
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_acquisition_comparison(X1_test, X2_test, surrogates_dict, svm_proba,
+                                ensemble_ucb, X_train_pos, X_train_neg,
+                                best_points, ensemble_best_norm):
+    """
+    6-panel plot: 4 surrogate constrained UCBs + SVM probability + ensemble UCB.
+
+    Parameters:
+    -----------
+    X1_test, X2_test : meshgrid arrays for the prediction surface
+    surrogates_dict : dict mapping name -> constrained UCB values on the grid
+    svm_proba : SVM classifier P(promising) on the grid
+    ensemble_ucb : ensemble-averaged UCB on the grid
+    X_train_pos : positive training points (scaled)
+    X_train_neg : negative training points (scaled)
+    best_points : dict mapping name -> {'norm': array, ...} for each surrogate's best point
+    ensemble_best_norm : best ensemble point in normalised space
+    """
+    fig, axes = plt.subplots(2, 3, figsize=(22, 12))
+    fig.suptitle("Acquisition Function Comparison (SVM-constrained UCB)", fontsize=14)
+
+    def _scatter_all(ax):
+        ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='blue', s=80,
+                   edgecolors='k', zorder=5, label='Pos. training')
+        ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='red', s=80,
+                   marker='^', edgecolors='k', zorder=5, label='Neg. training')
+
+    for i, (name, ucb_vals) in enumerate(surrogates_dict.items()):
+        ax = axes[i // 3, i % 3]
+        cf = ax.contourf(X1_test, X2_test, ucb_vals.reshape(X1_test.shape), levels=20, cmap='YlOrRd')
+        _scatter_all(ax)
+        bp = best_points[name]
+        ax.scatter(bp['norm'][0], bp['norm'][1],
+                   c='lime', s=300, marker='*', edgecolors='k', zorder=10, label='Suggested')
+        ax.set_title(f'{name}')
+        ax.set_xlabel('$x_1$')
+        ax.set_ylabel('$x_2$')
+        ax.legend(fontsize=7)
+        plt.colorbar(cf, ax=ax)
+
+    # SVM constraint plot
+    ax = axes[1, 1]
+    cf = ax.contourf(X1_test, X2_test, svm_proba.reshape(X1_test.shape), levels=20, cmap='RdYlGn')
+    _scatter_all(ax)
+    ax.set_title('SVM P(promising)')
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+    ax.legend(fontsize=7)
+    plt.colorbar(cf, ax=ax)
+
+    # Ensemble UCB
+    ax = axes[1, 2]
+    cf = ax.contourf(X1_test, X2_test, ensemble_ucb.reshape(X1_test.shape), levels=20, cmap='YlOrRd')
+    _scatter_all(ax)
+    ax.scatter(ensemble_best_norm[0], ensemble_best_norm[1],
+               c='lime', s=300, marker='*', edgecolors='k', zorder=10, label='ENSEMBLE pick')
+    ax.set_title('Ensemble (avg of 4 surrogates)')
+    ax.set_xlabel('$x_1$')
+    ax.set_ylabel('$x_2$')
+    ax.legend(fontsize=7)
+    plt.colorbar(cf, ax=ax)
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_3D_mean_uncertainty_slice(X_train, X1, X2, mu, sigma, X_excluded=None, title_prefix='', x3_slice_val=0.5):
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig.suptitle(f'{title_prefix} - Slice at X3 = {x3_slice_val:.2f}', fontsize=16)
+
+    # Plot Mean
+    contour = axes[0].contourf(X1, X2, mu, 100, cmap='viridis')
+    axes[0].scatter(X_train[:, 0], X_train[:, 1], c='r', marker='x', label='Training Points')
+    if X_excluded is not None:
+        axes[0].scatter(X_excluded[:, 0], X_excluded[:, 1], c='k', marker='o', s=10, label='Excluded Points')
+    axes[0].set_title('Mean Prediction')
+    axes[0].set_xlabel('X1')
+    axes[0].set_ylabel('X2')
+    fig.colorbar(contour, ax=axes[0])
+    axes[0].legend()
+
+    # Plot Uncertainty (Sigma)
+    contour = axes[1].contourf(X1, X2, sigma, 100, cmap='inferno')
+    axes[1].scatter(X_train[:, 0], X_train[:, 1], c='r', marker='x', label='Training Points')
+    if X_excluded is not None:
+        axes[1].scatter(X_excluded[:, 0], X_excluded[:, 1], c='k', marker='o', s=10, label='Excluded Points')
+    axes[1].set_title('Uncertainty (Std. Dev.)')
+    axes[1].set_xlabel('X1')
+    axes[1].set_ylabel('X2')
+    fig.colorbar(contour, ax=axes[1])
+    axes[1].legend()
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+def plot_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt, X_train, X_train_pos, X_train_neg, svm_labels, x3_slice_val):
+    fig, axes = plt.subplots(1, 3, figsize=(22, 6))
+    fig.suptitle(f'SVM Analysis - Slice at X3 = {x3_slice_val:.2f}', fontsize=16)
+    
+    # Plot SVM Classifier Probability
+    ax = axes[0]
+    contour = ax.contourf(X1, X2, svm_proba, 100, cmap='Greens')
+    promising = X_train[svm_labels==1]
+    unpromising = X_train[svm_labels==0]
+    ax.scatter(promising[:, 0], promising[:, 1], c='blue', marker='o', s=50, label='Promising')
+    ax.scatter(unpromising[:, 0], unpromising[:, 1], c='red', marker='x', s=50, label='Not Promising')
+    ax.set_title('SVM Classifier P(Promising)')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    fig.colorbar(contour, ax=ax)
+    ax.legend()
+
+    # Plot SVR (log-space)
+    ax = axes[1]
+    contour = ax.contourf(X1, X2, mu_svr_log, 100, cmap='viridis')
+    ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='r', marker='x', label='Positive Training Points')
+    ax.set_title('SVR Surrogate (log-space)')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    fig.colorbar(contour, ax=ax)
+    ax.legend()
+    
+    # Plot SVR (QuantileTransformer)
+    ax = axes[2]
+    contour = ax.contourf(X1, X2, mu_svr_qt, 100, cmap='viridis')
+    ax.scatter(X_train[:, 0], X_train[:, 1], c='r', marker='x', label='All Training Points')
+    ax.set_title('SVR Surrogate (QuantileTransformer)')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    fig.colorbar(contour, ax=ax)
+    ax.legend()
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+def plot_acquisition_comparison_slice(X1, X2, surrogates, svm_proba, ensemble_ucb, X_train_pos, X_train_neg, x3_slice_val):
+    n_surrogates = len(surrogates)
+    # Layout: surrogates on top row, SVM + Ensemble on bottom row
+    n_cols = max(n_surrogates, 2)
+    fig, axes = plt.subplots(2, n_cols, figsize=(8 * n_cols, 12))
+    if n_cols == 1:
+        axes = axes.reshape(2, 1)
+    fig.suptitle(f'Acquisition Functions (SVM-constrained UCB) - Slice at X3 = {x3_slice_val:.2f}', fontsize=16)
+
+    # Plot individual surrogates (top row)
+    for i, (name, ucb_vals) in enumerate(surrogates.items()):
+        ax = axes[0, i]
+        contour = ax.contourf(X1, X2, ucb_vals, 100, cmap='cividis')
+        ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='r', marker='x', s=20, label='Positive Points')
+        if X_train_neg.any():
+            ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='k', marker='o', s=10, label='Negative Points')
+
+        best_idx_slice = np.unravel_index(np.argmax(ucb_vals), ucb_vals.shape)
+        ax.plot(X1[best_idx_slice], X2[best_idx_slice], 'y*', markersize=15, label='Slice Max')
+
+        ax.set_title(name)
+        ax.set_xlabel('X1')
+        ax.set_ylabel('X2')
+        fig.colorbar(contour, ax=ax)
+        ax.legend()
+
+    # Hide unused top-row axes
+    for i in range(n_surrogates, n_cols):
+        axes[0, i].set_visible(False)
+
+    # Plot SVM Probability (bottom left)
+    ax = axes[1, 0]
+    contour = ax.contourf(X1, X2, svm_proba, 100, cmap='Greens')
+    ax.set_title('SVM P(Promising)')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    fig.colorbar(contour, ax=ax)
+
+    # Plot Ensemble UCB (bottom right)
+    ax = axes[1, 1]
+    contour = ax.contourf(X1, X2, ensemble_ucb, 100, cmap='plasma')
+    ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='r', marker='x', s=20, label='Positive Points')
+    if X_train_neg.any():
+        ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='k', marker='o', s=10, label='Negative Points')
+
+    best_idx_slice = np.unravel_index(np.argmax(ensemble_ucb), ensemble_ucb.shape)
+    ax.plot(X1[best_idx_slice], X2[best_idx_slice], 'y*', markersize=15, label='Slice Max')
+
+    ax.set_title('Ensemble UCB (Average of Normalized)')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    fig.colorbar(contour, ax=ax)
+    ax.legend()
+
+    # Hide unused bottom-row axes
+    for i in range(2, n_cols):
+        axes[1, i].set_visible(False)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+
+def plot_nd_mean_uncertainty_slice(X_train, X1, X2, mu_grid, sigma_grid,
+                                   dim1_idx, dim2_idx, X_excluded=None,
+                                   title_prefix='', fixed_info=''):
+    """
+    2-panel contour (mean + uncertainty) for an N-D GP, showing a 2D slice.
+
+    Parameters:
+    -----------
+    X_train : training points in scaled space (n_samples, n_dims)
+    X1, X2 : 2D meshgrid arrays for the two visible dimensions
+    mu_grid : predicted mean on the 2D grid (same shape as X1)
+    sigma_grid : predicted std on the 2D grid
+    dim1_idx, dim2_idx : int indices of the two dimensions being plotted
+    X_excluded : optional excluded training points (n_samples, n_dims)
+    title_prefix : string prepended to the suptitle
+    fixed_info : string describing fixed dimension values, shown in suptitle
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    suptitle = f'{title_prefix}'
+    if fixed_info:
+        suptitle += f' | {fixed_info}'
+    fig.suptitle(suptitle, fontsize=14)
+
+    d1_label = f'$x_{{{dim1_idx+1}}}$'
+    d2_label = f'$x_{{{dim2_idx+1}}}$'
+
+    for ax in axes:
+        ax.scatter(X_train[:, dim1_idx], X_train[:, dim2_idx],
+                   c='red', marker='x', s=60, zorder=5, label='Training')
+        if X_excluded is not None and len(X_excluded) > 0:
+            ax.scatter(X_excluded[:, dim1_idx], X_excluded[:, dim2_idx],
+                       c='black', marker='o', s=30, zorder=5, label='Excluded')
+
+    cf0 = axes[0].contourf(X1, X2, mu_grid, levels=30, cmap='viridis')
+    axes[0].set_title('Mean Prediction')
+    axes[0].set_xlabel(d1_label)
+    axes[0].set_ylabel(d2_label)
+    fig.colorbar(cf0, ax=axes[0])
+    axes[0].legend(fontsize=8)
+
+    cf1 = axes[1].contourf(X1, X2, sigma_grid, levels=30, cmap='inferno')
+    axes[1].set_title('Uncertainty (Std. Dev.)')
+    axes[1].set_xlabel(d1_label)
+    axes[1].set_ylabel(d2_label)
+    fig.colorbar(cf1, ax=axes[1])
+    axes[1].legend(fontsize=8)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.93])
+    plt.show()
+
+
+def plot_nd_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt,
+                                X_train, X_train_pos, X_train_neg, svm_labels,
+                                dim1_idx, dim2_idx, fixed_info=''):
+    """
+    3-panel SVM analysis for an N-D problem, showing a 2D slice.
+
+    Parameters:
+    -----------
+    X1, X2 : 2D meshgrid arrays for the two visible dimensions
+    svm_proba : SVM classifier P(promising) on the 2D grid
+    mu_svr_log : SVR log-space predictions on the 2D grid
+    mu_svr_qt : SVR QT predictions on the 2D grid
+    X_train : all training points in scaled space
+    X_train_pos : positive training points
+    X_train_neg : negative training points
+    svm_labels : binary labels (1=promising, 0=not)
+    dim1_idx, dim2_idx : int indices of the two visible dimensions
+    fixed_info : string describing fixed dimension values
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(22, 6))
+    suptitle = 'SVM Analysis'
+    if fixed_info:
+        suptitle += f' | {fixed_info}'
+    fig.suptitle(suptitle, fontsize=14)
+
+    d1_label = f'$x_{{{dim1_idx+1}}}$ (scaled)'
+    d2_label = f'$x_{{{dim2_idx+1}}}$ (scaled)'
+
+    # Panel 1: SVM Classifier
+    ax = axes[0]
+    cf = ax.contourf(X1, X2, svm_proba, levels=20, cmap='RdYlGn')
+    ax.scatter(X_train[svm_labels==1, dim1_idx], X_train[svm_labels==1, dim2_idx],
+               c='green', s=150, edgecolors='k', label='Promising', zorder=5)
+    ax.scatter(X_train[svm_labels==0, dim1_idx], X_train[svm_labels==0, dim2_idx],
+               c='red', s=150, edgecolors='k', label='Not promising', zorder=5)
+    ax.set_xlabel(d1_label)
+    ax.set_ylabel(d2_label)
+    ax.set_title('SVM Classifier: P(promising)')
+    ax.legend(fontsize=8)
+    fig.colorbar(cf, ax=ax)
+
+    # Panel 2: SVR log-space
+    ax = axes[1]
+    cf = ax.contourf(X1, X2, mu_svr_log, levels=20, cmap='RdYlGn')
+    ax.scatter(X_train_pos[:, dim1_idx], X_train_pos[:, dim2_idx],
+               c='blue', s=150, edgecolors='k', zorder=5)
+    ax.scatter(X_train_neg[:, dim1_idx], X_train_neg[:, dim2_idx],
+               c='red', s=150, marker='^', edgecolors='k', zorder=5, label='Excluded')
+    ax.set_xlabel(d1_label)
+    ax.set_ylabel(d2_label)
+    ax.set_title('SVR Surrogate: log10(y) [pos only]')
+    ax.legend(fontsize=8)
+    fig.colorbar(cf, ax=ax, label='log10(y)')
+
+    # Panel 3: SVR QT
+    ax = axes[2]
+    cf = ax.contourf(X1, X2, mu_svr_qt, levels=20, cmap='RdYlGn')
+    ax.scatter(X_train[:, dim1_idx], X_train[:, dim2_idx],
+               c='blue', s=150, edgecolors='k', zorder=5)
+    ax.set_xlabel(d1_label)
+    ax.set_ylabel(d2_label)
+    ax.set_title('SVR Surrogate: y_qt [all points]')
+    fig.colorbar(cf, ax=ax, label='QuantileTransformer(y)')
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.93])
+    plt.show()
+
+
+def plot_nd_acquisition_comparison_slice(X1, X2, surrogates, svm_proba,
+                                          ensemble_ucb, X_train_pos, X_train_neg,
+                                          dim1_idx, dim2_idx, fixed_info=''):
+    """
+    Acquisition function comparison for N-D, showing a 2D slice.
+
+    Parameters:
+    -----------
+    X1, X2 : 2D meshgrid arrays
+    surrogates : dict mapping name -> constrained UCB values (2D arrays)
+    svm_proba : SVM P(promising) (2D array)
+    ensemble_ucb : ensemble UCB (2D array)
+    X_train_pos, X_train_neg : positive/negative training points
+    dim1_idx, dim2_idx : int indices of visible dimensions
+    fixed_info : string describing fixed dimension values
+    """
+    n_surrogates = len(surrogates)
+    n_cols = max(n_surrogates, 2)
+    fig, axes = plt.subplots(2, n_cols, figsize=(8 * n_cols, 12))
+    if n_cols == 1:
+        axes = axes.reshape(2, 1)
+
+    suptitle = 'Acquisition Functions (SVM-constrained UCB)'
+    if fixed_info:
+        suptitle += f' | {fixed_info}'
+    fig.suptitle(suptitle, fontsize=14)
+
+    d1_label = f'$x_{{{dim1_idx+1}}}$'
+    d2_label = f'$x_{{{dim2_idx+1}}}$'
+
+    def _scatter_all(ax):
+        ax.scatter(X_train_pos[:, dim1_idx], X_train_pos[:, dim2_idx],
+                   c='r', marker='x', s=20, label='Positive')
+        if len(X_train_neg) > 0:
+            ax.scatter(X_train_neg[:, dim1_idx], X_train_neg[:, dim2_idx],
+                       c='k', marker='o', s=10, label='Negative')
+
+    for i, (name, ucb_vals) in enumerate(surrogates.items()):
+        ax = axes[0, i]
+        cf = ax.contourf(X1, X2, ucb_vals, levels=30, cmap='cividis')
+        _scatter_all(ax)
+        best_idx = np.unravel_index(np.argmax(ucb_vals), ucb_vals.shape)
+        ax.plot(X1[best_idx], X2[best_idx], 'y*', markersize=15, label='Slice Max')
+        ax.set_title(name)
+        ax.set_xlabel(d1_label)
+        ax.set_ylabel(d2_label)
+        fig.colorbar(cf, ax=ax)
+        ax.legend(fontsize=7)
+
+    for i in range(n_surrogates, n_cols):
+        axes[0, i].set_visible(False)
+
+    # SVM
+    ax = axes[1, 0]
+    cf = ax.contourf(X1, X2, svm_proba, levels=20, cmap='Greens')
+    ax.set_title('SVM P(Promising)')
+    ax.set_xlabel(d1_label)
+    ax.set_ylabel(d2_label)
+    fig.colorbar(cf, ax=ax)
+
+    # Ensemble
+    ax = axes[1, 1]
+    cf = ax.contourf(X1, X2, ensemble_ucb, levels=30, cmap='plasma')
+    _scatter_all(ax)
+    best_idx = np.unravel_index(np.argmax(ensemble_ucb), ensemble_ucb.shape)
+    ax.plot(X1[best_idx], X2[best_idx], 'y*', markersize=15, label='Ensemble Max')
+    ax.set_title('Ensemble UCB')
+    ax.set_xlabel(d1_label)
+    ax.set_ylabel(d2_label)
+    fig.colorbar(cf, ax=ax)
+    ax.legend(fontsize=7)
+
+    for i in range(2, n_cols):
+        axes[1, i].set_visible(False)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.93])
     plt.show()
