@@ -748,7 +748,12 @@ def plot_log_transform(y_raw, y_log, pos_mask, title='Log10 Transform (Positive 
 
 
 def plot_svm_analysis(X1_test, X2_test, svm_proba, mu_svr_log, mu_svr_qt,
-                      X_train, X_train_pos, X_train_neg, svm_labels):
+                      X_train, X_train_pos, X_train_neg, svm_labels,
+                      support_vec_mask=None,
+                      panel2_title='SVR Surrogate: log10(y) [pos only]',
+                      panel2_cbar='log10(y)',
+                      panel3_title='SVR Surrogate: y_qt [all points]',
+                      panel2_neg_label='Excluded'):
     """
     3-panel plot: SVM classifier probability, SVR log-space surrogate, SVR QT surrogate.
 
@@ -762,6 +767,9 @@ def plot_svm_analysis(X1_test, X2_test, svm_proba, mu_svr_log, mu_svr_qt,
     X_train_pos : positive training points (scaled)
     X_train_neg : negative training points (scaled)
     svm_labels : binary labels (1=promising, 0=not)
+    panel2_title : title for the middle panel (override for weeks without log surrogate)
+    panel2_cbar : colorbar label for the middle panel
+    panel3_title : title for the right panel
     """
     fig, axes = plt.subplots(1, 3, figsize=(22, 6))
     fig.suptitle("SVM Analysis", fontsize=14)
@@ -773,6 +781,10 @@ def plot_svm_analysis(X1_test, X2_test, svm_proba, mu_svr_log, mu_svr_qt,
                c='green', s=150, edgecolors='k', label='Promising', zorder=5)
     ax.scatter(X_train[svm_labels==0, 0], X_train[svm_labels==0, 1],
                c='red', s=150, edgecolors='k', label='Not promising', zorder=5)
+    if support_vec_mask is not None:
+        ax.scatter(X_train[support_vec_mask, 0], X_train[support_vec_mask, 1],
+                   c='none', s=400, edgecolors='yellow', linewidths=2.5,
+                   marker='D', zorder=10, label='Support vectors')
     ax.set_xlabel('$x_1$ (scaled)')
     ax.set_ylabel('$x_2$ (scaled)')
     ax.set_title('SVM Classifier: P(promising region)')
@@ -783,12 +795,12 @@ def plot_svm_analysis(X1_test, X2_test, svm_proba, mu_svr_log, mu_svr_qt,
     ax = axes[1]
     cf = ax.contourf(X1_test, X2_test, mu_svr_log.reshape(X1_test.shape), levels=20, cmap='RdYlGn')
     ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='blue', s=150, edgecolors='k', zorder=5)
-    ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='red', s=150, marker='^', edgecolors='k', zorder=5, label='Excluded')
+    ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='red', s=150, marker='^', edgecolors='k', zorder=5, label=panel2_neg_label)
     ax.set_xlabel('$x_1$ (scaled)')
     ax.set_ylabel('$x_2$ (scaled)')
-    ax.set_title('SVR Surrogate: log10(y) [pos only]')
+    ax.set_title(panel2_title)
     ax.legend()
-    plt.colorbar(cf, ax=ax, label='log10(y)')
+    plt.colorbar(cf, ax=ax, label=panel2_cbar)
 
     # SVR Surrogate on QuantileTransformer (all points)
     ax = axes[2]
@@ -796,7 +808,7 @@ def plot_svm_analysis(X1_test, X2_test, svm_proba, mu_svr_log, mu_svr_qt,
     ax.scatter(X_train[:, 0], X_train[:, 1], c='blue', s=150, edgecolors='k', zorder=5)
     ax.set_xlabel('$x_1$ (scaled)')
     ax.set_ylabel('$x_2$ (scaled)')
-    ax.set_title('SVR Surrogate: y_qt [all points]')
+    ax.set_title(panel3_title)
     plt.colorbar(cf, ax=ax, label='QuantileTransformer(y)')
 
     plt.tight_layout()
@@ -807,7 +819,8 @@ def plot_acquisition_comparison(X1_test, X2_test, surrogates_dict, svm_proba,
                                 ensemble_ucb, X_train_pos, X_train_neg,
                                 best_points, ensemble_best_norm):
     """
-    6-panel plot: 4 surrogate constrained UCBs + SVM probability + ensemble UCB.
+    Adaptive panel plot: N surrogate constrained UCBs + SVM probability + ensemble UCB.
+    Layout is computed from the number of surrogates so unused panels are never rendered.
 
     Parameters:
     -----------
@@ -820,17 +833,24 @@ def plot_acquisition_comparison(X1_test, X2_test, surrogates_dict, svm_proba,
     best_points : dict mapping name -> {'norm': array, ...} for each surrogate's best point
     ensemble_best_norm : best ensemble point in normalised space
     """
-    fig, axes = plt.subplots(2, 3, figsize=(22, 12))
+    n_surr = len(surrogates_dict)
+    n_total = n_surr + 2  # surrogates + SVM + Ensemble
+    n_cols = 3 if n_total > 4 else max(n_total, 2)
+    n_rows = int(np.ceil(n_total / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 6 * n_rows))
+    axes = np.array(axes).flatten()
     fig.suptitle("Acquisition Function Comparison (SVM-constrained UCB)", fontsize=14)
 
     def _scatter_all(ax):
-        ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='blue', s=80,
-                   edgecolors='k', zorder=5, label='Pos. training')
-        ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='red', s=80,
-                   marker='^', edgecolors='k', zorder=5, label='Neg. training')
+        if len(X_train_pos):
+            ax.scatter(X_train_pos[:, 0], X_train_pos[:, 1], c='blue', s=80,
+                       edgecolors='k', zorder=5, label='Pos. training')
+        if len(X_train_neg):
+            ax.scatter(X_train_neg[:, 0], X_train_neg[:, 1], c='red', s=80,
+                       marker='^', edgecolors='k', zorder=5, label='Neg. training')
 
     for i, (name, ucb_vals) in enumerate(surrogates_dict.items()):
-        ax = axes[i // 3, i % 3]
+        ax = axes[i]
         cf = ax.contourf(X1_test, X2_test, ucb_vals.reshape(X1_test.shape), levels=20, cmap='YlOrRd')
         _scatter_all(ax)
         bp = best_points[name]
@@ -843,7 +863,7 @@ def plot_acquisition_comparison(X1_test, X2_test, surrogates_dict, svm_proba,
         plt.colorbar(cf, ax=ax)
 
     # SVM constraint plot
-    ax = axes[1, 1]
+    ax = axes[n_surr]
     cf = ax.contourf(X1_test, X2_test, svm_proba.reshape(X1_test.shape), levels=20, cmap='RdYlGn')
     _scatter_all(ax)
     ax.set_title('SVM P(promising)')
@@ -853,16 +873,20 @@ def plot_acquisition_comparison(X1_test, X2_test, surrogates_dict, svm_proba,
     plt.colorbar(cf, ax=ax)
 
     # Ensemble UCB
-    ax = axes[1, 2]
+    ax = axes[n_surr + 1]
     cf = ax.contourf(X1_test, X2_test, ensemble_ucb.reshape(X1_test.shape), levels=20, cmap='YlOrRd')
     _scatter_all(ax)
     ax.scatter(ensemble_best_norm[0], ensemble_best_norm[1],
                c='lime', s=300, marker='*', edgecolors='k', zorder=10, label='ENSEMBLE pick')
-    ax.set_title('Ensemble (avg of 4 surrogates)')
+    ax.set_title(f'Ensemble (avg of {n_surr} surrogate{"s" if n_surr != 1 else ""})')
     ax.set_xlabel('$x_1$')
     ax.set_ylabel('$x_2$')
     ax.legend(fontsize=7)
     plt.colorbar(cf, ax=ax)
+
+    # Hide any unused axes
+    for j in range(n_total, len(axes)):
+        axes[j].set_visible(False)
 
     plt.tight_layout()
     plt.show()
@@ -896,7 +920,7 @@ def plot_3D_mean_uncertainty_slice(X_train, X1, X2, mu, sigma, X_excluded=None, 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
 
-def plot_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt, X_train, X_train_pos, X_train_neg, svm_labels, x3_slice_val):
+def plot_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt, X_train, X_train_pos, X_train_neg, svm_labels, x3_slice_val, support_vec_mask=None):
     fig, axes = plt.subplots(1, 3, figsize=(22, 6))
     fig.suptitle(f'SVM Analysis - Slice at X3 = {x3_slice_val:.2f}', fontsize=16)
     
@@ -907,6 +931,10 @@ def plot_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt, X_train, X
     unpromising = X_train[svm_labels==0]
     ax.scatter(promising[:, 0], promising[:, 1], c='blue', marker='o', s=50, label='Promising')
     ax.scatter(unpromising[:, 0], unpromising[:, 1], c='red', marker='x', s=50, label='Not Promising')
+    if support_vec_mask is not None:
+        ax.scatter(X_train[support_vec_mask, 0], X_train[support_vec_mask, 1],
+                   c='none', s=400, edgecolors='yellow', linewidths=2.5,
+                   marker='D', zorder=10, label='Support vectors')
     ax.set_title('SVM Classifier P(Promising)')
     ax.set_xlabel('X1')
     ax.set_ylabel('X2')
@@ -1051,7 +1079,7 @@ def plot_nd_mean_uncertainty_slice(X_train, X1, X2, mu_grid, sigma_grid,
 
 def plot_nd_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt,
                                 X_train, X_train_pos, X_train_neg, svm_labels,
-                                dim1_idx, dim2_idx, fixed_info=''):
+                                dim1_idx, dim2_idx, fixed_info='', support_vec_mask=None):
     """
     3-panel SVM analysis for an N-D problem, showing a 2D slice.
 
@@ -1084,6 +1112,10 @@ def plot_nd_svm_analysis_slice(X1, X2, svm_proba, mu_svr_log, mu_svr_qt,
                c='green', s=150, edgecolors='k', label='Promising', zorder=5)
     ax.scatter(X_train[svm_labels==0, dim1_idx], X_train[svm_labels==0, dim2_idx],
                c='red', s=150, edgecolors='k', label='Not promising', zorder=5)
+    if support_vec_mask is not None:
+        ax.scatter(X_train[support_vec_mask, dim1_idx], X_train[support_vec_mask, dim2_idx],
+                   c='none', s=400, edgecolors='yellow', linewidths=2.5,
+                   marker='D', zorder=10, label='Support vectors')
     ax.set_xlabel(d1_label)
     ax.set_ylabel(d2_label)
     ax.set_title('SVM Classifier: P(promising)')
