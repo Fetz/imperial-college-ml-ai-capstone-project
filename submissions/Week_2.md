@@ -1,4 +1,4 @@
-# Week 1 Submissions:
+# Week 2 Submissions:
 
 - Function 1 (2 - D): 0.360537-0.111424
 - Function 2 (2 - D): 0.142699-0.028698

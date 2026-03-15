@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bbo-capstone"
+version = "0.1.0"
+description = "Black-Box Optimisation Capstone — Imperial College ML/AI"
+requires-python = ">=3.9"
+dependencies = [
+    # Core scientific stack
+    "numpy",
+    "scipy",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    # Surrogate models & preprocessing
+    "scikit-learn",
+    "shap",
+    # Notebook environment
+    "jupyter",
+    "ipykernel",
+    "nbconvert",
+    # Future: gradient-based surrogate steering & deep kernel learning
+    # Uncomment when ready to use PyTorch / GPyTorch:
+    # "torch",
+    # "gpytorch",
+]
+
+[tool.setuptools.packages.find]
+where = ["notebooks"]
+include = ["utils*"]
+
+[project.optional-dependencies]
+torch = [
+    "torch",
+    "gpytorch",
+]
+dev = [
+    "pytest",
+    "ruff",
+]

@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: bbo-capstone
+Version: 0.1.0
+Summary: Black-Box Optimisation Capstone — Imperial College ML/AI
+Requires-Python: >=3.9
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: pandas
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: scikit-learn
+Requires-Dist: shap
+Requires-Dist: jupyter
+Requires-Dist: ipykernel
+Requires-Dist: nbconvert
+Provides-Extra: torch
+Requires-Dist: torch; extra == "torch"
+Requires-Dist: gpytorch; extra == "torch"
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"

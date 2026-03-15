@@ -7,7 +7,7 @@
     }
   },
   "updateContentCommand": "sudo chsh -s /usr/bin/zsh vscode",
-  "postCreateCommand": "chmod +x .devcontainer/setup.sh && cp .devcontainer/.zshrc ~/.zshrc",
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && cp .devcontainer/.zshrc ~/.zshrc && pip install -e '.[torch]'",
   "customizations": {
     "devpod": {
       "defaultShell": "/bin/zsh"
