@@ -90,10 +90,20 @@ Constraints:
   - Fn3: Fixed SVM threshold from hardcoded `yi > −50` (all points labelled promising, SVM constraint inactive) to `yi > np.median(y_log_pos)` for proper 50/50 split.
   - Fn7: Noise detection threshold changed from absolute `ls > 100` to relative `ls > mean + 2×std` with weak `GammaPrior(1, 0.1)` prior; x3 still confirmed as noise dim.
   - Fn8: Re-evaluated active subspace with the same relative threshold — only x8 identified as noise; 7D active space (down from 6D in Week 5 which also dropped x6).
-- **Week 7 (planned)**:
-  - **Gradient-based acquisition optimisation (Fn7, Fn8)**: Replace LHS argmax with multi-start gradient ascent directly through the GPyTorch surrogate. With 50K candidates in 5D/7D, average LHS spacing is ~17–27% of the range per dimension — a smooth Matern 2.5 GP may have peaks between samples. Implementation: reparameterise input as `x = sigmoid(z)` to enforce `[0,1]` bounds without killing gradients, run Adam for 200 steps from 64 LHS-seeded starts, take the global argmax. Note: disable `fast_pred_var()` during the optimisation loop (it breaks autograd); re-enable for final batch predictions. Applies only to Fn7 and Fn8 which already use GPyTorch; sklearn-based functions (Fn2, Fn3, Fn5, Fn6) are not differentiable and keep LHS argmax.
-  - **Fn3**: Raise `length_scale_bounds` upper limit from 50 → 1e3 in `gp_qt` kernel — x1 is hitting the wall (ls=50, ConvergenceWarning). x1 appears to be a noise dimension; loosening the bound lets the optimiser confirm this cleanly. Consider dropping x1 and running LHS in 2D active subspace (x2, x3).
-  - **Fn8 exploitation shift**: If week 6 query returns poor y (well below current best 9.889), reduce kappa toward 2.0 and add a proximity weight (penalise candidates far from current best) to exploit the known-good region.
+- **Week 7**:
+  - **Fn7, Fn8 — Gradient-based acquisition**: Replaced LHS argmax with multi-start gradient ascent through GPyTorch surrogate. x=sigmoid(z) reparameterisation enforces [0,1] bounds; Adam 200 steps from 64 LHS-seeded starts; fast_pred_var() disabled during loop for exact variance gradients.
+  - **Fn3 — length_scale_bounds raised 50→1e3**: Freed x1 lengthscale to confirm it as noise (ls hit 1000 ceiling, ConvergenceWarning). x1 confirmed noise → dropped to 2D active subspace (x2, x3); x1 fixed at training mean.
+  - **Fn1 — kappa reduced 8.0→5.0**: Three consecutive exploration queries (W5–W7) covered top-right/centre/top-left with no improvement; switching to exploit known signal near [0.483, 0.479]. Warm-start cluster (±0.05, 1K candidates) added.
+  - **Fn2 — EI boundary fix**: LHS candidates clipped to [0.05, 0.95] to prevent EI oscillating between opposite corners (x2→1 W5, x2→0 W7 pattern). Exploit cluster ±0.015 around best known added.
+  - **Fn4, Fn5 — Warm-start clusters**: Oracle history revealed sharp peaks ([0.433, 0.425, 0.379, 0.388] for Fn4; [0.120, 0.863, 0.880, 0.958] for Fn5). Dense cluster (±0.02, 1K candidates) added around each best known point.
+  - **Fn8 exploitation shift**: Not applied — W6 oracle returned 9.889 (improvement confirmed); budget-aware kappa schedule sufficient.
+- **Week 8 (planned)**:
+  - **Fn1**: If W7 returns no improvement, replace LHS with tight grid (±0.02) around [0.483, 0.479] — surrogate exhausted, probe oracle directly.
+  - **Fn2**: If W7 returns ≤ 0.611, accept as likely global max or try final tight probe near [0.703, 0.927]; consider retiring EI.
+  - **Fn4**: Force warm-start cluster override — bypass LHS entirely; GP length scales (~1.5) too large to guide away from noise, only oracle-confirmed peak region trustworthy.
+  - **Fn5**: If W7 beats 1630, exploit that neighbourhood; otherwise tighten cluster around [0.120, 0.863, 0.880, 0.958].
+  - **Fn7, Fn8**: Assess W7 oracle results for boundary behaviour; add proximity constraint if gradient ascent pushed into data-sparse corner with no improvement.
+  - **Fn3**: Remove SVM (20/21 support vectors, constraint inactive). Run clean 2D GP + UCB in (x2, x3) active subspace.
 
 ### Exploration vs exploitation strategy
 
@@ -108,7 +118,7 @@ My overall strategy prioritises exploration in early weeks and shifts toward exp
 | **NumPy** | Array operations, data loading (`.npy`), candidate manipulation |
 | **SciPy** (`stats.qmc.LatinHypercube`) | Candidate generation — space-filling LHS samples (10K–100K per function) |
 | **scikit-learn** | `GaussianProcessRegressor` (Matérn ARD kernel, MLE optimisation), `SVC`/`SVR` (RBF, SVM constraint & SVR surrogate), `QuantileTransformer`/`MinMaxScaler` |
-| **GPyTorch** | GPU-accelerated GPs with ARD kernel and `GammaPrior` lengthscale priors; used for Fn4 and Fn8 where prior-guided noise-dim detection is needed |
+| **GPyTorch** | GPU-accelerated GPs with ARD kernel and `GammaPrior` lengthscale priors; used in Fn1, Fn4, Fn7, Fn8 — Fn2, Fn3, Fn5, Fn6 use scikit-learn `GaussianProcessRegressor` |
 | **Matplotlib / Seaborn** | Surrogate surfaces, acquisition function contours, SVM boundaries via `utils/plotting_utils.py` |
 | **SHAP** | Feature importance analysis inside `plotting_utils.py` |
 | **Pandas** | Tabular summaries and data inspection |
@@ -159,6 +169,37 @@ devpod up .
 ```
 Dependencies are installed automatically via `postCreateCommand` in `.devcontainer/devcontainer.json`.
 
+## References
+
+| Reference | Relevance to this project |
+|---|---|
+| [Rasmussen & Williams (2006). *Gaussian Processes for Machine Learning*. MIT Press.](http://www.gaussianprocess.org/gpml/) | Foundational GP theory; Matérn-2.5 ARD kernel choice; GP as optimal surrogate for small-N, unknown-smoothness functions |
+| [Srinivas et al. (2010). *Gaussian Process Optimization in the Bandit Setting: No Regret and Experimental Design*. ICML.](https://arxiv.org/abs/0912.3995) | Theoretical basis for GP-UCB; justifies the budget-aware kappa schedule `5.0 - ((week-1)/13)*3.0` for exploration–exploitation balance |
+| [Jones, Schonlau & Welch (1998). *Efficient Global Optimization of Expensive Black-Box Functions*. Journal of Global Optimization.](https://doi.org/10.1023/A:1008306431147) | Canonical reference for Expected Improvement (EI); directly used in Fn2 (Week 6) after UCB caused repeated boundary recommendations |
+| [Wilson et al. (2018). *Maximizing Acquisition Functions for Bayesian Optimization*. NeurIPS.](https://arxiv.org/abs/1805.10196) | Basis for the gradient-based acquisition used in Fn7 and Fn8 (Week 7): multi-start Adam optimisation with sigmoid reparameterisation `x = sigmoid(z)` enforcing [0,1] bounds |
+| [Frazier (2018). *A Tutorial on Bayesian Optimization*. arXiv:1807.02811.](https://arxiv.org/abs/1807.02811) | Survey covering EI, UCB, and PI trade-offs; background for the UCB→EI switch for Fn2 and the exploration–exploitation kappa schedule |
+| [Letham et al. (2019). *Constrained Bayesian Optimization with Noisy Experiments*. Bayesian Analysis.](https://arxiv.org/abs/1706.07094) | Conceptual basis for using a classifier as an acquisition constraint; note: Letham uses GP-based constraints whereas this project uses an SVM multiplier (`constrained_ucb = ucb_shifted × svm_proba`) |
+| [Eriksson et al. (2019). *Scalable Global Optimization via Local Bayesian Optimization* (TuRBO). NeurIPS.](https://arxiv.org/abs/1910.01739) | Motivates local exploitation around the best known point; the warm-start clusters used here (dense uniform jitter ±0.02–0.05 around the best training point for Fn1, Fn2, Fn4, Fn5) are a simplified form of this idea, not a full TuRBO implementation |
+| [Cortes & Vapnik (1995). *Support-Vector Networks*. Machine Learning.](https://doi.org/10.1007/BF00994018) | Foundational SVM reference; backs the C parameter choices — C=1 (Fn3, Fn7) to prevent boundary collapse in high-D low-N regimes; C=10 (Fn1, Fn5, Fn6) where a stricter margin is needed. Fn2, Fn4, Fn8 use no SVM |
+| [McKay, Beckman & Conover (1979). *A Comparison of Three Methods for Selecting Values of Input Variables*. Technometrics.](https://doi.org/10.1080/00401706.1979.10489755) | Basis for Latin Hypercube Sampling as space-filling candidate generation (10K–100K per function) |
+| [Neal (1996). *Bayesian Learning for Neural Networks*. Springer.](https://www.cs.toronto.edu/~radford/ftp/thesis.pdf) | ARD (Automatic Relevance Determination) lengthscale interpretation used for noise-dimension detection in Fn3, Fn7, and Fn8 |
+| [Bergstra & Bengio (2012). *Random Search for Hyper-Parameter Optimization*. JMLR.](https://jmlr.org/papers/v13/bergstra12a.html) | Motivates ignoring low-importance dimensions: shows that effective dimensionality is often much lower than nominal dimensionality, supporting the decision to fix noise dims at their training mean rather than searching over them. The ARD detection method itself is grounded in Neal (1996) |
+
+## Additional Sources for Ongoing Refinement
+
+### Contingency research — reach for these before adding more ad-hoc fixes
+
+| Paper | Trigger condition |
+|---|---|
+| [Hennig & Schuler (2012). *Entropy Search for Information-Efficient Global Optimization*. JMLR.](https://jmlr.org/papers/v13/hennig12a.html) | **Fn1 / Fn2 still stuck after Week 8** — information-theoretic acquisition that targets the location of the maximum directly, not just high-σ regions; more appropriate than UCB/EI when the landscape is flat or the surrogate has uniformly low confidence |
+| [Eriksson & Jankowiak (2021). *High-Dimensional Bayesian Optimization with Sparse Axis-Aligned Subspaces* (SAASBO). UAI.](https://arxiv.org/abs/2103.00349) | **Fn4 / Fn5 warm-start clusters don't improve best y** — sparse ARD prior that aggressively shrinks the effective search space; GP length scales ~1.5 on Fn4 are too large to guide acquisition toward narrow peaks, SAASBO's prior would force sparser solutions |
+| [Gardner et al. (2014). *Bayesian Optimization with Inequality Constraints*. ICML.](http://proceedings.mlr.press/v32/gardner14.html) | **SVM constraint becomes inactive or collapses** (20+ support vectors, <5% promising coverage) — replaces the SVM P(promising) multiplier with a GP-modelled constraint probability; smoother, uncertainty-aware, and differentiable so it can be included in the gradient ascent objective rather than applied post-hoc |
+
+### Planned software migration
+| Library | Status | Why it's relevant |
+|---|---|---|
+| [BoTorch](https://botorch.org/) | Planned — not yet used | Built on GPyTorch (already used from Week 7); provides `optimize_acqf` with `LogEI` and `qLogNEI` natively, replacing the manually implemented Adam + sigmoid acquisition loop in Fn7/Fn8. Direct migration path: swap the gradient ascent loop for `optimize_acqf` |
+
 ## Structure
 
 ```
@@ -168,7 +209,7 @@ Dependencies are installed automatically via `postCreateCommand` in `.devcontain
 │   ├── setup.sh            # Installs Nix packages, Neovim plugins, project dependencies
 │   └── nvim/               # Neovim configuration
 ├── notebooks/              # Weekly per-function notebooks
-│   ├── week_{N}_function_{M}.ipynb   # N=1..6, M=1..8
+│   ├── week_{N}_function_{M}.ipynb   # N=1..7, M=1..8
 │   ├── utils/
 │   │   └── plotting_utils.py         # Shared visualisation helpers
 │   ├── data/
