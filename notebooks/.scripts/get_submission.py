@@ -87,8 +87,8 @@ FUNC_SURROGATE, FUNC_ACTIVE_DIMS = _parse_notebooks_readme()
 # Submission extraction
 # ---------------------------------------------------------------------------
 
-def extract_submission(nb_path: Path) -> Optional[str]:
-    """Return the SUBMISSION: tag value from executed notebook outputs, or None."""
+def _extract_tag(nb_path: Path, pattern: str) -> Optional[str]:
+    """Return the first capture group of *pattern* found in any executed cell output."""
     with open(nb_path) as f:
         nb = json.load(f)
 
@@ -100,10 +100,25 @@ def extract_submission(nb_path: Path) -> Optional[str]:
             if output.get("output_type") in ("stream", "display_data", "execute_result"):
                 raw = output.get("text", output.get("data", {}).get("text/plain", ""))
                 text = "".join(raw) if isinstance(raw, list) else raw
-            match = re.search(r"SUBMISSION:\s*([\d.\-]+)", text)
+            match = re.search(pattern, text)
             if match:
                 return match.group(1).strip()
     return None
+
+
+def extract_submission(nb_path: Path) -> Optional[str]:
+    """Return the SUBMISSION: tag value from executed notebook outputs, or None."""
+    return _extract_tag(nb_path, r"SUBMISSION:\s*([\d.\-]+)")
+
+
+def extract_surrogate(nb_path: Path) -> Optional[str]:
+    """Return the SURROGATE: tag value from executed notebook outputs, or None."""
+    return _extract_tag(nb_path, r"SURROGATE:\s*(.+)")
+
+
+def extract_active_dims(nb_path: Path) -> Optional[str]:
+    """Return the ACTIVE_DIMS: tag value from executed notebook outputs, or None."""
+    return _extract_tag(nb_path, r"ACTIVE_DIMS:\s*(.+)")
 
 
 def format_submission(values_str: str, dims: int) -> str:
@@ -246,9 +261,14 @@ def generate_results(write: bool = False) -> None:
         best_x = load_best_point(latest_week, fn)
         y_str = f"{best_y:.4e}" if best_y is not None else "—"
         x_str = "-".join(f"{v:.4f}" for v in best_x) if best_x is not None else "—"
+
+        nb_path = NOTEBOOKS_DIR / f"week_{latest_week}_function_{fn}.ipynb"
+        surrogate = (extract_surrogate(nb_path) if nb_path.exists() else None) or FUNC_SURROGATE.get(fn, "—")
+        active = (extract_active_dims(nb_path) if nb_path.exists() else None) or FUNC_ACTIVE_DIMS.get(fn, "—")
+
         lines.append(
-            f"| {fn}  | {dims}D   | {FUNC_SURROGATE.get(fn, '—')} "
-            f"| {FUNC_ACTIVE_DIMS.get(fn, '—')} | {y_str} | `{x_str}` |\n"
+            f"| {fn}  | {dims}D   | {surrogate} "
+            f"| {active} | {y_str} | `{x_str}` |\n"
         )
 
     lines.append("\n")
