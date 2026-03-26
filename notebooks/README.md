@@ -9,39 +9,39 @@ Each function:
 - Is treated as a maximisation problem
 - Has inputs bounded in [0, 1]^d
 
-## Current data (Week 7)
+## Current data (Week 8)
 
 | Fn | Dims | Points | y range |
 |----|------|--------|---------|
-| 1  | 2D   | 16     | [−3.61e−3, 5.62e−6] |
-| 2  | 2D   | 16     | well-behaved positive |
-| 3  | 3D   | 21     | [−0.399, −0.022] all negative |
-| 4  | 4D   | 36     | [−37.5, 0.40] outlier at min |
-| 5  | 4D   | 26     | [0.113, 1630] all positive, wide range |
-| 6  | 5D   | 26     | [−2.57, −0.335] all negative |
-| 7  | 6D   | 36     | [0.003, 2.857] all positive |
-| 8  | 8D   | 46     | well-behaved positive |
+| 1  | 2D   | 17     | [−3.61e−3, 5.62e−6] |
+| 2  | 2D   | 17     | well-behaved positive |
+| 3  | 3D   | 22     | [−0.399, −0.014] all negative |
+| 4  | 4D   | 37     | [−37.5, 0.40] outlier at min |
+| 5  | 4D   | 27     | [0.113, 1630] all positive, wide range |
+| 6  | 5D   | 27     | [−2.57, −0.335] all negative |
+| 7  | 6D   | 37     | [0.003, 2.857] all positive |
+| 8  | 8D   | 47     | well-behaved positive |
 
-## Per-function strategy (Week 7)
+## Per-function strategy (Week 8)
 
-| Fn | Dims | Best y (W6) | Surrogate | Active dims | Output transform | SVM? | kappa |
+| Fn | Dims | Best y (W8) | Surrogate | Active dims | Output transform | SVM? | kappa |
 |----|------|-------------|-----------|-------------|------------------|------|-------|
-| 1  | 2D   | 5.62e−6     | GP + SVR ensemble | all 2D | QuantileTransformer | Yes (C=10) | 5.0 (reduced from 8.0; warm-start ±0.05 around best) |
+| 1  | 2D   | 5.62e−6     | GP + SVR ensemble | all 2D | QuantileTransformer | **No (disabled W8 — 16/16 SVs, collapsed)** | **0.5 (hard exploit; 5 no-improvements; 2K warm-start only ±0.02/±0.05)** |
 | 2  | 2D   | 6.11e−1     | GP | all 2D | QuantileTransformer | No | EI (clip [0.05, 0.95]; exploit cluster ±0.015 around best) |
-| 3  | 3D   | −2.24e−2    | 2-GP ensemble | **2D active (x2, x3; x1 noise, dropped W7)** | QT + log10 | Yes (C=1) | 3.615 |
-| 4  | 4D   | 4.01e−1     | GP | all 4D | QuantileTransformer | No | 2.0 (override; warm-start ±0.02 around best) |
-| 5  | 4D   | 1.630e+3    | 2-GP ensemble | all 4D | QT + log10 | Yes (C=10) | 3.615 (warm-start ±0.02 around best) |
-| 6  | 5D   | −3.35e−1    | 2-GP ensemble | all 5D | QT + log10 | Yes (C=10) | 3.615 |
-| 7  | 6D   | 2.857e+0    | 2-GP ensemble | 5D (x3 dropped) | QT + log10 | Yes (C=1) | 3.615 (**gradient-based UCB**: 64 starts × 200 Adam steps) |
-| 8  | 8D   | 9.889e+0    | GP | 7D (x8 dropped) | QuantileTransformer | No | 3.615 (**gradient-based UCB**: 64 starts × 200 Adam steps) |
+| 3  | 3D   | −1.36e−2    | 2-GP ensemble | **2D active (x2, x3; x1 noise, dropped W7)** | QT + log10 | **No (removed W8 — 20/21 SVs, constraint inactive)** | **3.385** |
+| 4  | 4D   | 4.01e−1     | GP | all 4D | QuantileTransformer | No | **1.5 (override; warm-start 5K ±0.05 + 5K LHS, rebalanced from 1K/10K)** |
+| 5  | 4D   | 1.630e+3    | 2-GP ensemble | all 4D | QT + log10 | **No (disabled W8 — warm-start-only mode)** | **0.5 (hard exploit; 4+ no-improvements; 2K warm-start only ±0.01/±0.03)** |
+| 6  | 5D   | −3.35e−1    | 2-GP ensemble | all 5D | QT + log10 | Yes (C=10) | **3.385** |
+| 7  | 6D   | 2.857e+0    | 2-GP ensemble | 5D (x3 dropped) | QT + log10 | Yes (C=1) | **3.385** (**gradient-based UCB**: 64 starts × 200 Adam steps) |
+| 8  | 8D   | 9.889e+0    | GP | 7D (x8 dropped) | QuantileTransformer | No | **3.385** (**gradient-based UCB**: 64 starts × 200 Adam steps) |
 
 **Notes:**
 - *Active dims*: dimensions used for LHS candidate search. Noise dimensions are fixed at their training mean before submitting to the oracle.
 - *SVM*: SVC (RBF) classifies promising vs unpromising regions. P(promising) multiplies the UCB score. Fail-safe activates if <5% of candidates are classified as promising.
-- *kappa*: budget-aware formula gives `5.0 - ((week-1)/13)*3.0`; Fn2 uses Expected Improvement (EI) instead of UCB — kappa does not apply.
+- *kappa*: budget-aware formula gives `5.0 - ((week-1)/13)*3.0` = 3.385 at Week 8; Fn1/Fn5 override to 0.5 (hard exploit after 4–5 no-improvements); Fn4 override to 1.5; Fn2 uses Expected Improvement (EI) instead of UCB — kappa does not apply.
 - *2-GP ensemble*: one GP on QuantileTransformer output, one on log10-shifted output, averaged after UCB.
 - *Gradient UCB (Fn7, Fn8)*: acquisition maximised via Adam (64 LHS-seeded starts × 200 steps, lr=0.05) with sigmoid reparameterisation x=sigmoid(z) for [0,1] bounds. fast_pred_var disabled during loop for exact gradients; re-enabled for final evaluation.
-- *Warm-start cluster*: Fn1/2/4/5 append a dense cluster of candidates (±0.01–0.05) around the best known training point so exploitation options always compete against uncertain LHS regions.
+- *Warm-start cluster*: Fn2/Fn4 append a dense cluster around best known point (LHS still active). Fn1/Fn5 switched to warm-start-only in Week 8 (LHS removed) — 2K candidates each, tight+wide jitter around best known point.
 
 ## Per-function design decisions and alternatives considered
 
@@ -50,9 +50,9 @@ Each function:
 
 **Surrogate**: GP + SVR ensemble (2 surrogates). A 4-surrogate ensemble (Week 4) was reduced because `gp_log` and `svr_log` both relied on the collapsed log representation and added noise rather than signal. SVR(QT) acts as a regularising cross-check on the GP prediction.
 
-**Acquisition kappa**: Reduced 8.0 → 5.0 in Week 7 after three consecutive exploration queries (W5–W7) covering top-right/centre/top-left with no improvement. The budget-aware formula (4.08 at week 7) was overridden upward to 8.0 in weeks 5–6 because spatial coverage was poor; switched back to exploitation once coverage was sufficient.
+**Acquisition kappa**: Reduced 8.0 → 5.0 in Week 7, then overridden to **0.5 in Week 8** after five consecutive no-improvements. The budget-aware formula gives 3.385 at week 8, but with the surrogate exhausted (no improvement since W4) pure exploitation via the GP mean is more reliable than high-kappa UCB. Candidate pool switched to warm-start only (2K, ±0.02/±0.05 around best) — LHS removed.
 
-**SVM**: C=10, gamma='auto' (≈0.5 for 2D). C=1 was too soft — all 16 balanced points fell inside the wide margin, making every point a support vector and the boundary uninformative. gamma='scale' (≈6) was too local and caused boundary collapse.
+**SVM**: **Disabled in Week 8.** Previously C=10, gamma='auto' — tuned to avoid the two failure modes (all-SVs with C=1, boundary collapse with gamma='scale'). However, 16/16 training points became support vectors regardless, making P(promising) ≈ uniform. The constraint was silently inactive; disabling it has no effect on acquisition quality.
 
 ---
 
@@ -70,7 +70,7 @@ Each function:
 
 **Noise detection caveat**: The x1 noise decision is based on gp_qt alone (ls = 1000, ceiling hit, ConvergenceWarning). gp_log gives x1 ls = 16.88 — elevated but not at the ceiling, so it would not independently flag x1 as noise. The decision is therefore supported by one of the two GPs; the ConvergenceWarning is treated as the deciding evidence.
 
-**SVM**: To be removed in Week 8. With only 21 points in 3D and 20/21 as support vectors, the decision boundary wraps around every training point — the constraint is inactive (P(promising) ≈ uniform). The median threshold gives a 50/50 label split by design, but with so few points the SVM cannot learn a meaningful boundary.
+**SVM**: **Removed in Week 8.** With only 22 points in 3D and 20/21 as support vectors (Week 7), the decision boundary wrapped around every training point — the constraint was inactive (P(promising) ≈ uniform). Removal simplifies acquisition to clean 2D GP-UCB with no constraint overhead.
 
 **Output transform**: All 21 y values are negative. Shift by `abs(min) + 1.0` to bring all values into positive territory for the log transform. QT + log10 ensemble handles the compressed range.
 
@@ -88,9 +88,9 @@ Each function:
 ### Function 5 (4D)
 **Output transform**: QT + log10. y ∈ [0.113, 1630] — all positive, 4 orders of magnitude. Log10 compresses the spike; QT handles rank ordering. Both GPs in the ensemble are meaningful here (unlike Fn1 where log collapsed).
 
-**SVM**: C=10, soft margin with median threshold. Used to suppress the flat low-value plateau (most y < 200) and focus acquisition on the high-value region near y ≈ 1630.
+**SVM**: **Disabled in Week 8.** Previously C=10, gamma=2.0 (between 'auto' for smooth boundary and 'scale' for tight boundary). In warm-start-only mode the SVM constraint was routing away from the spike neighbourhood; plain UCB over the warm-start cluster is more reliable than an SVM-filtered surface with no LHS background.
 
-**Warm-start cluster**: Oracle history shows a sharp peak at `[0.120, 0.863, 0.880, 0.958]`. Dense cluster (±0.02, 1K candidates) added in Week 7 to prevent global LHS from ignoring a narrow but confirmed high-value region.
+**Warm-start cluster**: Oracle history shows a sharp peak at `[0.120, 0.863, 0.880, 0.958]`. In Week 8, switched to pure warm-start exploitation — 2K candidates (±0.01 tight + ±0.03 wide). LHS removed; kappa overridden to 0.5 (hard exploit) after 4 consecutive no-improvements.
 
 ---
 
